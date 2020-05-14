@@ -61,7 +61,7 @@ describe.only('Articles Endpoints', function () {
             })
 
             it('responds with 200 and the specified article', () => {
-                const articleId = 2
+                const articleId = 20
                 const expectedArticle = testArticles[articleId - 1]
                 return supertest(app)
                     .get(`/articles/${articleId}`)
@@ -70,6 +70,7 @@ describe.only('Articles Endpoints', function () {
 
             describe.only(`POST /articles`, () => {
                 it(`creates an article, responding with 201 and the new article`, function () {
+                    this.retries(3)
                     const newArticle = {
                         title: 'Test new article',
                         style: 'Listicle',
@@ -85,7 +86,7 @@ describe.only('Articles Endpoints', function () {
                             expect(res.body.content).to.eql(newArticle.content)
                             expect(res.body).to.have.property('id')
                             expect(res.headers.location).to.eql(`/articles/${res.body.id}`)
-                            const expected = new Date().toLocaleString('en', { timeZone: 'UTC' })
+                            const expected = new Date().toLocaleString()
                             const actual = new Date(res.body.date_published).toLocaleString()
                             expect(actual).to.eql(expected)
                         })
