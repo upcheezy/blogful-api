@@ -61,14 +61,14 @@ describe.only('Articles Endpoints', function () {
             })
 
             it('responds with 200 and the specified article', () => {
-                const articleId = 20
+                const articleId = 4
                 const expectedArticle = testArticles[articleId - 1]
                 return supertest(app)
                     .get(`/articles/${articleId}`)
                     .expect(200, expectedArticle)
             })
 
-            describe.only(`POST /articles`, () => {
+            describe(`POST /articles`, () => {
                 it(`creates an article, responding with 201 and the new article`, function () {
                     this.retries(3)
                     const newArticle = {
@@ -96,6 +96,69 @@ describe.only('Articles Endpoints', function () {
                             .expect(postRes.body)
                         )
                 })
+
+                const requiredFields = ['title', 'style', 'content'];
+
+                requiredFields.forEach(field => {
+                    const newArticle = {
+                        title: 'Test new article',
+                        style: 'Listicle',
+                        content: 'Test new article content...'
+                    }
+
+                    it(`responds with 400 and an error message when the '${field}' is missing`, () => {
+                        delete newArticle[field]
+
+                        return supertest(app)
+                            .post('/articles')
+                            .send(newArticle)
+                            .expect(400, {
+                                error: {
+                                    message: `Missing '${field}' in request body`
+                                }
+                            })
+                    })
+                })
+            })
+
+            describe.only(`DELETE /articles/:article_id`, () => {
+                context('Given there are articles in the database', () => {
+                    const idToRemove = 10
+                    const expectedArticles = testArticles.filter(article => article.id !== idToRemove)
+                    return supertest(app)
+                        .delete(`/articles/${idToRemove}`)
+                        .expect(204)
+                        .then(res =>
+                            supertest(app)
+                            .get(`/articles`)
+                            .expect(expectedArticles)
+                        )
+                })
+            })
+        })
+
+        context(`Given an XSS attack article`, () => {
+            const maliciousArticle = {
+                id: 911,
+                title: 'Naughty naughty very naughty <script>alert("xss");</script>',
+                style: 'How-to',
+                content: `Bad image <img src="https://url.to.file.which/does-not.exist" onerror="alert(document.cookie);">. But not <strong>all</strong> bad.`
+            }
+
+            this.beforeEach('insert malicious article', () => {
+                return db
+                    .into('blogful_articles')
+                    .insert([maliciousArticle])
+            })
+
+            it('removes XSS attack content', () => {
+                return supertest(app)
+                    .get(`/articles/${maliciousArticle.id}`)
+                    .expect(200)
+                    .expect(res => {
+                        expect(res.body.title).to.eql(`Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;`)
+                        expect(res.body.content).to.eql(`Bad image <img src="https://url.to.file.which/does-not.exist">. But not <strong>all</strong> bad.`)
+                    })
             })
         })
 
